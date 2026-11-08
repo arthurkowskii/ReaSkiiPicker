@@ -1,0 +1,37 @@
+local root=assert(PICKER_ROOT)
+local checks={}
+local function check(ok,label) assert(ok,label); checks[#checks+1]='PASS\t'..label end
+local ok,err=xpcall(function()
+ local H=dofile(root..'/src/host.lua')
+ local M=dofile(root..'/src/model.lua')
+ local fx=H.catalog()
+ check(#fx>0,'EnumInstalledFX returns real host catalog')
+ local chosen
+ for _,p in ipairs(fx) do if p.name:find('JS:',1,true)==1 then chosen=p; break end end
+ check(chosen~=nil,'JSFX available in isolated REAPER')
+ local state={categories={},plugins={}}
+ local results=M.results(state,fx,chosen.name,'')
+ check(#results>0 and #state.plugins==0,'global search exposes uncategorized native FX')
+ local yes=H.insert(chosen)
+ check(not yes,'insertion without selected track refuses')
+ reaper.Undo_BeginBlock2(0)
+ reaper.InsertTrackAtIndex(0,false)
+ local track=reaper.GetTrack(0,0); reaper.SetOnlyTrackSelected(track)
+ reaper.Undo_EndBlock2(0,'Create isolated test track',-1)
+ local inserted,index=H.insert(chosen)
+ check(inserted and index==0 and reaper.TrackFX_GetCount(track)==1,'selected search result inserts real FX')
+ local _,name=reaper.TrackFX_GetFXName(track,0,'')
+ check(type(name)=='string' and #name>0,'inserted FX resolves native name')
+ check(#state.plugins==0,'direct insertion never adds to curated collection')
+ check(reaper.Undo_CanUndo2(0)~=nil,'insertion creates native undo point')
+ reaper.Undo_DoUndo2(0)
+ check(reaper.TrackFX_GetCount(track)==0,'native Undo removes inserted FX')
+ local S=dofile(root..'/src/store.lua')
+ local imported=assert(S.load_picker(PICKER_SOURCE))
+ check(#imported.categories==25 and #imported.plugins==121,'actual Picker data imports inside REAPER')
+ check(reaper.ImGui_GetBuiltinPath~=nil,'ReaImGui loaded in isolated host')
+end,debug.traceback)
+local f=assert(io.open(PICKER_RESULT,'w'))
+f:write(table.concat(checks,'\n'),'\n')
+if ok then f:write('DONE\t',#checks,'\n') else f:write('ERROR\t',err,'\n') end
+f:close()

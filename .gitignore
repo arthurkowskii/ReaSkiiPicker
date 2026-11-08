@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+qa/
+dist/
+.venv/
+
+# Credentials, runtime libraries and third-party installation data
+.env
+.env.*
+*.key
+*.dll
+*.so
+*.dylib
+*.bak
+library.json
+library.json.*
+categories.json
+plugins.json
+config.json
+PluginPicker/
+previews/
+.hermes/
