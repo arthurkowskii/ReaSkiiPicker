@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -94,6 +95,9 @@ def gh(*args):
 
 def publish(built, report_path):
     report = verify_evidence(built, report_path)
+    installer = json.loads(subprocess.check_output([
+        sys.executable, str(ROOT / 'scripts/build_installer.py'), '--ref', built['commit'],
+        '--verification-report', str(report_path)], cwd=ROOT, text=True))
     repo = json.loads(gh('repo', 'view', REPO, '--json', 'isPrivate,url'))
     if repo.get('isPrivate') is not True:
         raise ValueError('Refuse to publish outside the private repository')
@@ -109,7 +113,13 @@ def publish(built, report_path):
             raise ValueError('Existing tag does not identify this exact commit')
     elif '404' not in ref.stderr:
         raise RuntimeError(ref.stderr)
-    notes = f'''Archive d'installation uniquement : `{Path(built['archive']).name}`.
+    notes = f'''Installation recommandee : telecharger `{Path(installer['installer']).name}`.
+
+Dans Actions > New action > Load ReaScript, charger ce fichier depuis n'importe quel dossier, puis l'executer une fois.
+L'installateur autonome place tous les fichiers dans le bon dossier REAPER et enregistre l'action ReaSkii_Picker.lua.
+Il preserve les classements et sauvegarde les fichiers remplaces. Aucun droit administrateur ni telechargement supplementaire.
+
+Alternative manuelle : `{Path(built['archive']).name}`.
 
 Extraire le dossier `ReaSkiiPicker` dans `Scripts` du dossier de ressources REAPER.
 Dans REAPER : Options > Show REAPER resource path in explorer/finder.
@@ -119,6 +129,7 @@ Ne pas remplacer `REAPER/ReaSkiiPicker/library.json` : ce sont vos données, pas
 
 Sources : `{built['commit']}`. Runtime identique à la version vérifiée ({report['total_checks']} contrôles ; preuves de tests et de démarrage Windows distinctes).
 SHA256 de l'archive d'installation : `{built['sha256']}`.
+SHA256 de l'installateur autonome : `{installer['installer_sha256']}`.
 
 Les liens « Source code » ajoutés par GitHub ne sont pas le paquet d'installation.
 '''
@@ -127,21 +138,23 @@ Les liens « Source code » ajoutés par GitHub ne sont pas le paquet d'installa
     with tempfile.TemporaryDirectory(dir=scratch) as work:
         notes_path = Path(work) / 'notes.md'
         notes_path.write_text(notes)
-        gh('release', 'create', tag, built['archive'], '--repo', REPO, '--target', built['commit'],
+        gh('release', 'create', tag, built['archive'], installer['installer'], '--repo', REPO, '--target', built['commit'],
            '--prerelease', '--title', 'ReaSkii Picker ' + built['version'], '--notes-file', str(notes_path))
         release = json.loads(gh('release', 'view', tag, '--repo', REPO, '--json',
                                 'url,tagName,isDraft,isPrerelease,assets'))
         if release['isDraft'] or not release['isPrerelease'] or release['tagName'] != tag:
             raise ValueError('Unexpected published release state')
-        asset = Path(built['archive']).name
-        if len(release['assets']) != 1 or release['assets'][0]['name'] != asset:
+        expected = {Path(built['archive']).name: built['sha256'],
+                    Path(installer['installer']).name: installer['installer_sha256']}
+        if {asset['name'] for asset in release['assets']} != set(expected):
             raise ValueError('Unexpected release assets')
         remote_ref = json.loads(gh('api', 'repos/' + REPO + '/git/ref/tags/' + tag))['object']
         if remote_ref['sha'] != built['commit']:
             raise ValueError('Published tag has the wrong commit')
-        gh('release', 'download', tag, '--repo', REPO, '--pattern', asset, '--dir', work)
-        if sha((Path(work) / asset).read_bytes()) != built['sha256']:
-            raise ValueError('Downloaded release asset checksum mismatch')
+        for asset, digest in expected.items():
+            gh('release', 'download', tag, '--repo', REPO, '--pattern', asset, '--dir', work)
+            if sha((Path(work) / asset).read_bytes()) != digest:
+                raise ValueError('Downloaded release asset checksum mismatch: ' + asset)
     return release
 
 

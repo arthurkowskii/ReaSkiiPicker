@@ -2,6 +2,17 @@
 
 ## Télécharger le bon fichier
 
+**Methode recommandee : l'installateur autonome `ReaSkiiPicker-<version>-setup.lua`.**
+
+1. Telecharger ce fichier unique, par exemple dans Telechargements. Ne pas le deplacer dans les dossiers REAPER.
+2. Dans REAPER : **Actions > Show action list > New action > Load ReaScript**, choisir ce fichier.
+3. Executer l'action d'installation une fois. Tous les modules sont inclus : l'installateur detecte le dossier REAPER du profil courant, installe l'arborescence et enregistre l'action `ReaSkii_Picker.lua`.
+4. Repondre Oui pour ouvrir le navigateur. Ensuite, utiliser l'action `ReaSkii_Picker.lua` ; l'action d'installation peut etre retiree de la liste.
+
+Aucun droit administrateur ni Python n'est requis. ReaImGui 0.10 ou superieur reste un prerequis ; s'il manque, l'installateur l'indique avant de modifier les fichiers. Les anciennes versions sont sauvegardees, les classements et images restent a leur place. Un point d'entree 0.1.1 connu place directement dans `Scripts` est remplace par un lanceur de compatibilite pour conserver son raccourci. Un script different est laisse intact.
+
+Le ZIP ci-dessous reste une alternative pour une installation manuelle avancee.
+
 Dans les Releases du dépôt privé, télécharger l'asset `ReaSkiiPicker-<version>-install.zip`.
 Ne pas utiliser les liens « Source code (zip/tar.gz) » que GitHub ajoute automatiquement : ils contiennent le projet de développement.
 
@@ -64,4 +75,4 @@ Après les tests, l'installation vérifiée et le push du commit :
 python scripts/runtime_release.py --ref HEAD --publish --verification-report qa/package-report.json
 ```
 
-La publication exige que chaque fichier runtime soit identique au candidat testé et que le rapport de déploiement corresponde à son archive. Elle vérifie la confidentialité du dépôt, le commit du tag, la liste des assets et le SHA256 de l'asset retéléchargé depuis GitHub. Les preuves QA et données du poste restent locales.
+La publication exige que chaque fichier runtime soit identique au candidat testé et que le rapport de déploiement corresponde à son archive. Elle genere aussi l'installateur autonome depuis les memes fichiers. Elle vérifie la confidentialité du dépôt, le commit du tag, la liste des assets et les SHA256 des deux assets retéléchargés depuis GitHub. Les preuves QA et données du poste restent locales.
